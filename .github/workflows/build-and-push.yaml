@@ -96,7 +96,7 @@ jobs:
       - name: Submit AWS Batch Job
         run: |
           JOB_QUEUE="batch-fargate-queue"
-          JOB_NAME="ecp-demo-job"
+          JOB_NAME="demo-job"
           JOB_DEF_NAME="my-app-job"
           aws batch submit-job \
             --job-name $JOB_NAME \
