@@ -44,24 +44,24 @@ jobs:
 
       - name: Register new AWS Batch Job Definition
         run: | 
-          # Describe current job definition
           JOB_DEF_NAME="my-app-job"
           echo "Using image URI: $IMAGE_URI"
-          aws batch describe-job-definitions \
+          
+          # Describe current job definition and get ONLY containerProperties
+          CONTAINER_PROPS=$(aws batch describe-job-definitions \
             --job-definition-name $JOB_DEF_NAME \
             --status ACTIVE \
-            --query 'jobDefinitions[0]' > jobdef.json
- 
-          # Replace image
-          NEW_JOB_DEF=$(jq --arg IMAGE "$IMAGE_URI" '.containerProperties.image = $IMAGE | del(.jobDefinitionArn,.revision,.status,.jobDefinitionName,.registeredBy,.registeredAt)' jobdef.json)
- 
-          echo "$NEW_JOB_DEF" > new-jobdef.json
- 
-          # Register new revision
+            --query 'jobDefinitions[0].containerProperties' \
+            --output json)
+          
+          # Update image
+          NEW_CONTAINER_PROPS=$(echo "$CONTAINER_PROPS" | jq --arg IMAGE "$IMAGE_URI" '.image = $IMAGE')
+          
+          # Register new job definition revision
           aws batch register-job-definition \
             --job-definition-name $JOB_DEF_NAME \
             --type container \
-            --container-properties file://<(echo "$NEW_JOB_DEF")
+            --container-properties "$NEW_CONTAINER_PROPS"
 
       - name: Submit AWS Batch Job
         run: |
