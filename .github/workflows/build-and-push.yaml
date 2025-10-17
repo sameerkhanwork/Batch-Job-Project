@@ -42,8 +42,33 @@ jobs:
         run: |
           echo "IMAGE_URI=${{ steps.login-ecr.outputs.registry }}/${{ secrets.ECR_REPOSITORY }}:${{ github.sha }}" >> $GITHUB_ENV
 
+      # - name: Register new AWS Batch Job Definition
+      #   run: | 
+      #     JOB_DEF_NAME="my-app-job"
+      #     echo "Using image URI: $IMAGE_URI"
+          
+      #     # Describe current job definition and get ONLY containerProperties
+      #     CONTAINER_PROPS=$(aws batch describe-job-definitions \
+      #       --job-definition-name $JOB_DEF_NAME \
+      #       --status ACTIVE \
+      #       --query 'jobDefinitions[0].containerProperties' \
+      #       --output json)
+          
+      #     # Update image
+      #     NEW_CONTAINER_PROPS=$(echo "$CONTAINER_PROPS" | jq --arg IMAGE "$IMAGE_URI" '
+      #       .image = $IMAGE
+      #       | .resourceRequirements |= map(
+      #           if .type == "VCPU" then .value = (.value | tostring | split(".")[0]) else . end
+      #         )
+      #     ')
+      #     # Register new job definition revision
+      #     aws batch register-job-definition \
+      #       --job-definition-name $JOB_DEF_NAME \
+      #       --type container \
+      #       --container-properties "$NEW_CONTAINER_PROPS"
+
       - name: Register new AWS Batch Job Definition
-        run: | 
+        run: |
           JOB_DEF_NAME="my-app-job"
           echo "Using image URI: $IMAGE_URI"
           
@@ -53,19 +78,20 @@ jobs:
             --status ACTIVE \
             --query 'jobDefinitions[0]' > jobdef.json
           
-          # Extract and update only containerProperties, keep top-level fields
-          NEW_JOB_DEF=$(jq \
+          # Extract only containerProperties and update image
+          CONTAINER_PROPS=$(jq \
             --arg IMAGE "$IMAGE_URI" \
-            '{
-              type: .type,
-              containerProperties: (.containerProperties | .image = $IMAGE),
-              platformCapabilities: .platformCapabilities
-            }' jobdef.json)
-    
-          echo "$NEW_JOB_DEF" > new-jobdef.json
-          # Register new job definition revision
+            '.containerProperties | .image = $IMAGE' jobdef.json)
+          
+          # Get platformCapabilities if it exists
+          PLATFORM_CAPS=$(jq -r '.platformCapabilities[0]' jobdef.json)
+          
+          # Register new revision with proper parameters
           aws batch register-job-definition \
-          --cli-input-json file://new-jobdef.json
+            --job-definition-name $JOB_DEF_NAME \
+            --type container \
+            --container-properties "$CONTAINER_PROPS" \
+            --platform-capabilities "$PLATFORM_CAPS"
 
       - name: Submit AWS Batch Job
         run: |
