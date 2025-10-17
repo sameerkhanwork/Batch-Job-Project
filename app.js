@@ -14,7 +14,7 @@
 
 // Simple AWS Batch demo app
  
-console.log("🚀 AWS Batch job started...");
+console.log("🚀 AWS Batch job started... ❤️❤️❤️❤️❤️");
  
 // Simulate some work (e.g. data processing)
 const delay = (ms) => new Promise((res) => setTimeout(res, ms));
