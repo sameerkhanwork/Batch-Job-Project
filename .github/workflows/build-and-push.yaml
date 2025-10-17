@@ -38,6 +38,39 @@ jobs:
           docker push $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
  
       - name: Output image URI
+        id: output-image
         run: |
-          echo "Image pushed: ${{ steps.login-ecr.outputs.registry }}/${{ secrets.ECR_REPOSITORY }}:${{ github.sha }}"
+          echo "IMAGE_URI=${{ steps.login-ecr.outputs.registry }}/${{ secrets.ECR_REPOSITORY }}:${{ github.sha }}" >> $GITHUB_ENV
+
+      - name: Register new AWS Batch Job Definition
+        run: | 
+          # Describe current job definition
+          JOB_DEF_NAME="my-app-job"
+          echo "Using image URI: $IMAGE_URI"
+          aws batch describe-job-definitions \
+            --job-definition-name $JOB_DEF_NAME \
+            --status ACTIVE \
+            --query 'jobDefinitions[0]' > jobdef.json
+ 
+          # Replace image
+          NEW_JOB_DEF=$(jq --arg IMAGE "$IMAGE_URI" '.containerProperties.image = $IMAGE | del(.jobDefinitionArn,.revision,.status,.jobDefinitionName,.registeredBy,.registeredAt)' jobdef.json)
+ 
+          echo "$NEW_JOB_DEF" > new-jobdef.json
+ 
+          # Register new revision
+          aws batch register-job-definition \
+            --job-definition-name $JOB_DEF_NAME \
+            --type container \
+            --container-properties file://<(echo "$NEW_JOB_DEF")
+
+      - name: Submit AWS Batch Job
+        run: |
+          JOB_QUEUE="batch-fargate-queue"
+          JOB_NAME="ecp-demo-job"
+          JOB_DEF_NAME="my-app-job"
+          aws batch submit-job \
+            --job-name $JOB_NAME \
+            --job-queue $JOB_QUEUE \
+            --job-definition $JOB_DEF_NAME
+ 
  
