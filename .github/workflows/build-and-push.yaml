@@ -55,7 +55,7 @@ jobs:
             --output json)
           
           # Update image
-          NEW_CONTAINER_PROPS=$(echo "$CONTAINER_PROPS" | jq --arg IMAGE "$IMAGE_URI" '.image = $IMAGE | if .vcpus then .vcpus = (.vcpus | floor) else .end')
+          NEW_CONTAINER_PROPS=$(echo "$CONTAINER_PROPS" | jq --arg IMAGE "$IMAGE_URI" '.image = $IMAGE | del(.vcpus)')
           
           # Register new job definition revision
           aws batch register-job-definition \
